@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.oracle.dao.GuideDao">
+
+
+	<insert id="save" parameterType="guide" keyProperty="guideId"
+		useGeneratedKeys="true">
+		insert into tb_guide
+		values(null,#{name},#{type},1,#{comment})
+	</insert>
+
+
+	<select id="getAll" resultType="guide">
+		select * from tb_guide
+	</select>
+
+	<select id="getJobGuides" resultType="guide">
+		select * from tb_guide
+		where type=2 and state=1 order by convert(name using gbk) 
+	</select>
+
+
+	<select id="getClassGuides" resultType="guide">
+		select * from tb_guide
+		where type=1 and state=1 order by convert(name using gbk) 
+	</select>
+
+
+
+
+	<select id="getClassGuideByClassId" resultType="guide"
+		parameterType="int">
+		select * from tb_guide
+		where GUIDEID
+		in(select class_guideId from tb_class
+		where classId=#{guideId})
+	</select>
+	
+	<select id="getJobGuideByClassId" resultType="guide"
+		parameterType="int">
+		select * from tb_guide
+		where GUIDEID
+		in(select job_guideId from tb_class
+		where classId=#{guideId})
+	</select>
+
+</mapper>

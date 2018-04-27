@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.oracle.dao.SchoolDao">
+
+
+	<select id="getAll" resultType="school">
+		select * from tb_school  order by convert(name using gbk) 
+	</select>
+
+
+	<select id="save" parameterType="school">
+		INSERT INTO tb_school (NAME, COMMENT) VALUES (#{name}, #{comment})
+	</select>
+	
+
+
+</mapper>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.oracle.dao.TeacherDao">
+
+	<insert id="save" parameterType="teacher" keyProperty="teacherId"
+		useGeneratedKeys="true">
+		insert into tb_teacher
+		values(null,#{name},#{teacherType},1,#{comment})
+	</insert>
+
+
+	<select id="getAll" resultType="teacher">
+		select * from tb_teacher where state=1 order by convert(name using gbk) 
+	</select>
+
+
+	<select id="getTeacherByClassId" resultType="teacher"
+		parameterType="int">
+		select * from tb_teacher where
+		teacherid in(select teacherid from tb_class
+		where classId=#{classId})
+	</select>
+</mapper>

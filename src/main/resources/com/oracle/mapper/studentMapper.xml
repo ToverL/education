@@ -1,0 +1,533 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.oracle.dao.StudentDao">
+
+
+	<!-- 获得某个学生的流转日志 -->
+	<select id="selectStudentChanges" resultType="map"
+		parameterType="int">
+		SELECT
+		EXEDATE exeDate,
+		STATENAME changeType,
+		tc.CLASSNAME
+		fromClassName,
+		tc2.CLASSNAME toClassName,
+		tsc.COMMENT comment
+		FROM
+		ta_student_change tsc
+		LEFT JOIN tb_class tc ON tsc.FROM_CLASSID =
+		tc.CLASSID
+		LEFT JOIN tb_class tc2 ON tsc.TO_CLASSID = tc2.CLASSID
+		LEFT
+		JOIN tb_state ts ON tsc.CHANGETYPEID= ts.STATEID
+		WHERE stuid=#{stuid}
+		order by EXEDATE
+	</select>
+
+
+
+	<!-- 班级的学生结课 -->
+	<insert id="insertClassStudentToEnd" parameterType="tclass">
+		INSERT INTO
+		ta_student_change (FROM_CLASSID, STUID, CHANGETYPEID, EXEDATE,
+		COMMENT)
+		select classid,stuid,306,#{endDate},'集体结课' from tb_student
+		where classid=#{classId} and stateId=1
+
+	</insert>
+
+	<!-- 学生入班后的状态变化 -->
+	<insert id="insertClassStudentToBegin" parameterType="student">
+		INSERT INTO
+		ta_student_change (FROM_CLASSID, STUID, CHANGETYPEID, EXEDATE,
+		COMMENT)
+		select #{tclass.classId},#{studentId},301, createdDate,'开班'
+		from tb_class
+		where classid=#{tclass.classId}
+	</insert>
+
+
+	<update id="changeStudentState" parameterType="studentChange">
+
+		update tb_student
+		s,(select teacherid tid,job_guideid jobid,class_guideid
+		cid,classId
+		clid from tb_class
+		where classid=#{toClass.classId}) t
+		set
+		teacherid=tid,jobguideid=jobid,classguideid=cid,classid=clid
+		<if test="toClass==null">
+		,stateId=#{changeType.stateId} 
+		</if>
+		
+		where
+		STUID=#{student.studentId}
+
+	</update>
+
+
+
+	<update id="changeStudentStateToMyself" parameterType="studentChange">
+
+		update tb_student
+		set
+		stateId=#{changeType.stateId} 	
+		where
+		STUID=#{student.studentId}
+
+	</update>
+
+	<insert id="changeStudent" parameterType="studentChange">
+		INSERT INTO ta_student_change (FROM_CLASSID, TO_CLASSID, STUID,
+		CHANGETYPEID, EXEDATE, COMMENT)
+		VALUES (
+		<choose>
+			<when test="fromClass!=null">
+				#{fromClass.classId},
+			</when>
+			<otherwise>
+				null,
+			</otherwise>
+		</choose>
+		<choose>
+			<when test="toClass!=null">
+				#{toClass.classId},
+			</when>
+			<otherwise>
+				null,
+			</otherwise>
+		</choose>
+
+
+		#{student.studentId}, #{changeType.stateId}, #{exeDate}, #{comment})
+
+	</insert>
+
+<!-- 新增学员 -->
+	<insert id="save" parameterType="student" keyProperty="studentId"
+		useGeneratedKeys="true">
+		insert into
+		tb_student(STUID,NAME,SEX,CLASSID,teacherId,degreeid,IDCARD,TEL,FTEL,MTEL,SCHOOLID,MAJOR,GRADE,CLASSGUIDEID,JOBGUIDEID,ADDRESS,COMMENT)
+		values(null,#{name},#{sex},#{tclass.classId},#{teacher.teacherId},#{degree.stateId},#{idcard},#{tel},#{ftel},#{mtel},
+		#{school.schoolId},#{major},#{grade},
+		#{classGuide.guideId},#{jobGuide.guideId},#{address},#{comment})
+	</insert>
+
+
+<!-- 导入学员 -->
+	<insert id="importStudent" parameterType="student" keyProperty="studentId"
+		useGeneratedKeys="true">
+		insert into
+		tb_student(STUID,NAME,SEX,CLASSID,teacherId,degreeid,IDCARD,TEL,FTEL,MTEL,SCHOOLID,MAJOR,GRADE,CLASSGUIDEID,JOBGUIDEID,ADDRESS,
+		INTENDCITY,WORKCITY,COMpany,JOB,ENDCLASSTIME,WORKTIME,SALARY,recommendTypeId,COMMENT)
+		values(null,#{name},#{sex},#{tclass.classId},#{teacher.teacherId},#{degree.stateId},#{idcard},#{tel},#{ftel},#{mtel},
+		#{school.schoolId},#{major},#{grade},
+		#{classGuide.guideId},#{jobGuide.guideId},#{address},
+		#{intendCity},#{workcity},#{company},#{job},#{endClassTime},#{worktime},#{salary},#{recommendType.stateId},
+		#{comment})
+	</insert>
+
+
+
+	<!-- 更新就业信息 -->
+
+	<update id="updateJob" parameterType="student">
+		UPDATE tb_student SET
+		INTENDCITY=#{intendCity}, WORKCITY=#{workcity}, Company=#{company},
+		JOB=#{job}, WORKTIME=#{worktime} ,
+		SALARY=#{salary},
+		SALARYOFYEAR=#{salaryOfYear},
+		recommendTypeId=#{recommendType.stateId}, STATEID=#{state.stateId}
+		WHERE STUID=#{studentId}
+	</update>
+
+
+	<!-- 更新学员 -->
+	<update id="updateStudentToEnd" parameterType="tclass">
+		UPDATE tb_student
+		SET
+		STATEID=2
+		where CLASSID=#{classId} and STATEID=1
+	</update>
+
+
+	<!-- 查询出就业信息的数量 -->
+	<select id="getJobListCount" resultType="int">
+	select count(*) 
+		<include refid="getJobList_table"/> 
+	</select>
+
+	<!-- 分页获得学生的就业信息 -->
+	<select id="getJobList" resultMap="studentOfAll">
+		SELECT s.*,
+		c.NAME classGuideName,
+		j.Name jobGuideName,t.name
+		teacherName,
+		cl.CLASSNAME
+		className,sc.NAME schoolName,
+		st.STATENAME
+		stateName ,d.stateName degreeName,rt.stateName recommendName
+		<include refid="getJobList_table"/> 
+		limit #{page.pageStart},#{page.pageSize} 
+	</select>
+
+
+<sql id="getJobList_table">
+	FROM
+		tb_student s
+		LEFT JOIN tb_guide c
+		ON s.CLASSGUIDEID = c.GUIDEID
+		LEFT JOIN
+		tb_guide j
+		ON s.JOBGUIDEID =j.GUIDEID
+		left JOIN tb_teacher t
+		on
+		s.teacherId=t.teacherId
+		left join tb_school sc
+		on s.SCHOOLID=sc.SCHOOLID
+		left join tb_class cl
+		on s.classid=cl.classid
+		left join tb_state st
+		on
+		s.stateid=st.stateid
+		left join tb_state d
+		on s.degreeid=d.stateid
+		left
+		join tb_state rt
+		on s.recommendTypeId=rt.stateid
+		<where>
+			<if test="param.schoolId!=0 and param.schoolId!=null">
+				s.schoolId=#{param.schoolId}
+			</if>
+			<if test="param.classId!=0 and param.classId!=null">
+				and s.classId=#{param.classId}
+			</if>
+
+			<if test="param.startDate!=null">
+				and s.endClassTime>#{param.startDate}
+			</if>
+
+			<if test="param.endDate!=null">
+				and s.endClassTime&lt;#{param.endDate}
+			</if>
+		</where>
+		order by s.stateId,salaryOfYear desc, convert(s.name using gbk) 
+</sql>
+
+
+<!-- 获得就业统计详细信息 -->
+	<select id="getJobDetails" resultType="map">
+		select
+		count(*) amount,
+		sum(salaryOfYear) salary,
+		count(salaryOfYear)
+		jobAmount,
+		count(case
+		when s.stateid=1 then 1
+		else null
+		end) doing,
+		count(case
+		when s.stateid=2 then 1
+		else null
+		end) endclass,
+		count(case
+		when s.stateid=3 then 1
+		else null
+		end) job,
+		count(case
+		when s.stateid=4
+		then 1
+		else null
+		end) goonstudy,
+		count(case
+		when s.stateid=5 then 1
+		else
+		null
+		end) government,
+		count(case
+		when s.stateid=6 then 1
+		else null
+		end)
+		exitClass,
+		count(case
+		when s.stateid=7 then 1
+		else null
+		end) delay,
+		count(case
+		when s.stateid=8 then 1
+		else null
+		end) changeJob,
+		count(case
+		when s.stateid=9 then 1
+		else null
+		end) unemployeement,
+		count(case
+		when
+		s.stateid=10 then 1
+		else null
+		end) absence
+
+		FROM
+		tb_student s
+		LEFT JOIN
+		tb_guide c
+		ON s.CLASSGUIDEID = c.GUIDEID
+		LEFT JOIN
+		tb_guide j
+		ON
+		s.JOBGUIDEID =j.GUIDEID
+		left JOIN tb_teacher t
+		on
+		s.teacherId=t.teacherId
+		left join tb_school sc
+		on s.SCHOOLID=sc.SCHOOLID
+		left join tb_class cl
+		on s.classid=cl.classid
+		left join tb_state st
+		on
+		s.stateid=st.stateid
+		left join tb_state d
+		on s.degreeid=d.stateid
+		left
+		join tb_state rt
+		on s.recommendTypeId=rt.stateid
+		<where>
+			<if test="param.schoolId!=0 and param.schoolId!=null">
+				s.schoolId=#{param.schoolId}
+			</if>
+			<if test="param.classId!=0 and param.classId!=null">
+				and s.classId=#{param.classId}
+			</if>
+
+			<if test="param.startDate!=null">
+				and s.endClassTime>#{param.startDate}
+			</if>
+
+			<if test="param.endDate!=null">
+				and s.endClassTime&lt;#{param.endDate}
+			</if>
+		</where>
+		 
+	</select>
+
+
+
+
+
+<!-- 根据条件查询学生人数； -->
+	<select id="getStudentsCountByMap" resultType="int">
+		select count(*)
+		<include refid="getAll_table" />
+			<where>
+			<if test="param.schoolId!=0 and param.schoolId!=null">
+				s.schoolId=#{param.schoolId}
+			</if>
+			<if test="param.stuName!=null and param.stuName!=''">
+				and s.name like '%${param.stuName}%'
+			</if>
+			<if test="param.className!=null and param.className!=''">
+				and cl.CLASSNAME like '%${param.className}%'
+			</if>
+		</where>
+	</select>
+
+
+
+	<!-- 分页查询学生信息 -->
+	<select id="getStudentsByMap" resultMap="studentOfAll" >
+		<include refid="getAll_sql" />
+		<where>
+			<if test="param.schoolId!=0 and param.schoolId!=null">
+				s.schoolId=#{param.schoolId}
+			</if>
+			<if test="param.stuName!=null and param.stuName!=''">
+				and s.name like '%${param.stuName}%'
+			</if>
+			<if test="param.className!=null and param.className!=''">
+				and cl.CLASSNAME like '%${param.className}%'
+			</if>
+		</where>
+		order by convert(s.name using gbk)
+		limit #{page.pageStart},#{page.pageSize} 
+	</select>
+
+
+<!-- 获得某个班级的学生信息 -->
+	<select id="getStudentByClassId" resultMap="studentOfAll">
+	
+	<include refid="getAll_sql" />
+		<where>			
+				s.classId=#{classId}			
+		</where>
+		order by convert(s.name using gbk)
+	</select>
+
+	
+	<sql id="getAll_columnName">
+	SELECT s.*,
+		c.NAME classGuideName,
+		j.Name jobGuideName,t.name
+		teacherName,
+		cl.CLASSNAME
+		className,sc.NAME
+		schoolName,
+		st.STATENAME
+		stateName
+		,d.stateName degreeName,rt.stateName
+		recommendName 
+	</sql>
+	
+	<sql id="getAll_table">
+	 FROM
+		tb_student s
+		LEFT
+		JOIN tb_guide c
+		ON s.CLASSGUIDEID =
+		c.GUIDEID
+		LEFT JOIN
+		tb_guide j
+		ON
+		s.JOBGUIDEID =j.GUIDEID
+		left JOIN
+		tb_teacher t
+		on
+		s.teacherId=t.teacherId
+		left join tb_school sc
+		on
+		s.SCHOOLID=sc.SCHOOLID
+		left join tb_class cl
+		on
+		s.classid=cl.classid
+		left join tb_state st
+		on
+		s.stateid=st.stateid
+		left
+		join tb_state d
+		on
+		s.degreeid=d.stateid
+		left join
+		tb_state rt
+		on
+		s.recommendTypeId=rt.stateid
+	</sql>
+
+	<sql id="getAll_sql">		
+		<include refid="getAll_columnName" />
+		<include refid="getAll_table" />
+	</sql>
+
+
+	<select id="getAll" resultMap="studentOfAll">
+		<include refid="getAll_sql" />
+	</select>
+	
+	
+	<select id="getAllCount" resultType="int">
+		select count(*)
+		<include refid="getAll_table" />
+	</select>
+
+
+	<resultMap type="student" id="studentOfAll">
+		<id column="stuId" property="studentId" />
+		<result column="name" property="name" />
+		<result column="sex" property="sex" />
+		<result column="idcard" property="idcard" />
+		<result column="major" property="major" />
+		<result column="grade" property="grade" />
+		<result column="tel" property="tel" />
+		<result column="mtel" property="mtel" />
+		<result column="ftel" property="ftel" />
+		<result column="address" property="address" />
+		<result column="intendCity" property="intendCity" />
+		<result column="workcity" property="workcity" />
+		<result column="job" property="job" />
+		<result column="worktime" property="worktime" />
+		<result column="salary" property="salary" />
+		<result column="salaryOfYear" property="salaryOfYear" />
+		<result column="comment" property="comment" />
+		<result column="company" property="company" />
+
+		<association property="tclass" javaType="tclass">
+			<id column="classId" property="classId" />
+			<result column="className" property="className" />
+		</association>
+
+		<association property="school" javaType="school">
+			<id column="SCHOOLID" property="schoolId" />
+			<result column="schoolName" property="name" />
+		</association>
+
+		<association property="jobGuide" javaType="guide">
+			<id column="jobGuideId" property="guideId" />
+			<result column="jobGuideName" property="name" />
+		</association>
+
+		<association property="classGuide" javaType="guide">
+			<id column="classGuideId" property="guideId" />
+			<result column="classGuideName" property="name" />
+		</association>
+
+		<association property="teacher" javaType="teacher">
+			<id column="teacherId" property="teacherId" />
+			<result column="teacherName" property="name" />
+		</association>
+
+		<association property="state" javaType="state">
+			<id column="stateId" property="stateId" />
+			<result column="stateName" property="stateName" />
+		</association>
+
+		<association property="degree" javaType="state">
+			<id column="degreeid" property="stateId" />
+			<result column="degreeName" property="stateName" />
+		</association>
+
+		<association property="recommendType" javaType="state">
+			<id column="recommendTypeId" property="stateId" />
+			<result column="recommendName" property="stateName" />
+		</association>
+	</resultMap>
+
+
+
+
+	<select id="getStudentById" resultMap="studentOfAll">
+		SELECT s.*,
+		c.NAME
+		classGuideName,
+		j.Name jobGuideName,t.name teacherName,
+		cl.CLASSNAME
+		className,sc.NAME schoolName,
+		st.STATENAME stateName ,d.stateName
+		degreeName,rt.stateName recommendName
+		FROM
+		tb_student s
+		LEFT JOIN
+		tb_guide c
+		ON s.CLASSGUIDEID = c.GUIDEID
+		LEFT JOIN tb_guide j
+		ON
+		s.JOBGUIDEID =j.GUIDEID
+		left JOIN tb_teacher t
+		on
+		s.teacherId=t.teacherId
+		left join tb_school sc
+		on s.SCHOOLID=sc.SCHOOLID
+		left join tb_class cl
+		on s.classid=cl.classid
+		left join tb_state st
+		on
+		s.stateid=st.stateid
+		left join tb_state d
+		on s.degreeid=d.stateid
+		left
+		join tb_state rt
+		on s.recommendTypeId=rt.stateid
+		where
+		s.stuId=#{studentId}
+	</select>
+
+</mapper>

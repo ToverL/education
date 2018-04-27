@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.oracle.dao.TclassDao">
+
+	<!-- 插入 -->
+	<insert id="save" parameterType="tclass" keyProperty="classId"
+		useGeneratedKeys="true">
+		insert into tb_class
+		values(null,#{className},#{classType.stateId},#{teacher.teacherId},#{classGuide.guideId},#{jobGuide.guideId},#{createdDate},null,101,#{comment})
+	</insert>
+
+	<!-- 结课 -->
+
+	<update id="endClass" parameterType="tclass">
+		update tb_class
+		set
+		endDate=#{endDate},stateId=102 where classId=#{classId}
+	</update>
+
+
+	<!--查询所有班级 -->
+	<select id="getAll" resultMap="classOfAll">
+		select c.*,cg.NAME
+		classGuideName,
+		jg.NAME jobGuideName,t.name teacherName ,st.stateName stateName
+		,ct.stateName classTypeName
+		from
+		tb_class c left join tb_guide cg
+		on
+		c.CLASS_GUIDEID=cg.GUIDEID
+		left join tb_guide jg
+		on
+		c.JOB_GUIDEID=jg.GUIDEID
+		left join tb_teacher t
+		on
+		c.TEACHERID=t.teacherId
+		left join tb_state st
+		on c.stateId=st.stateId
+		left join tb_state ct
+		on c.classTypeId=ct.stateId
+		order by createdDate
+		desc 
+	</select>
+
+
+	<!--根据班级状态 -->
+	<select id="getTclassByType" resultType="tclass" parameterType="int">
+		select * from tb_class where classTypeId=#{typeId} order by
+		createdDate desc,className
+	</select>
+
+
+
+	<!--根据方向获得所有的班级 -->
+	<select id="getTclassByState" resultType="tclass" parameterType="int">
+		select * from tb_class order by createdDate desc, convert(className using gbk) 
+	</select>
+
+
+	<select id="getClassById" resultMap="classOfAll" parameterType="int">
+		select c.*,cg.NAME
+		classGuideName,
+		jg.NAME jobGuideName,t.name
+		teacherName ,st.stateName stateName ,ct.stateName classTypeName
+
+		from
+		tb_class c left join tb_guide cg
+		on c.CLASS_GUIDEID=cg.GUIDEID
+		left join
+		tb_guide jg
+		on c.JOB_GUIDEID=jg.GUIDEID
+		left join tb_teacher t
+		on
+		c.TEACHERID=t.teacherId
+		left join tb_state st
+		on c.stateId=st.stateId
+		left join tb_state ct
+		on c.classTypeId=ct.stateId
+		where
+		c.classId=#{classId}
+
+	</select>
+
+
+
+	<resultMap type="tclass" id="classOfAll">
+		<id column="classId" property="classId" />
+		<result column="className" property="className" />
+		<result column="createdDate" property="createdDate" />
+		<result column="endDate" property="endDate" />
+		<result column="comment" property="comment" />
+
+		<association property="teacher" javaType="teacher">
+			<id column="teacherId" property="teacherId" />
+			<result column="teacherName" property="name" />
+		</association>
+
+		<association property="classGuide" javaType="guide">
+			<id column="class_GuideId" property="guideId" />
+			<result column="classGuidename" property="name" />
+		</association>
+
+		<association property="jobGuide" javaType="guide">
+			<id column="job_GuideId" property="guideId" />
+			<result column="jobGuidename" property="name" />
+		</association>
+
+		<association property="state" javaType="state">
+			<id column="stateId" property="stateId" />
+			<result column="stateName" property="stateName" />
+		</association>
+
+		<association property="classType" javaType="state">
+			<id column="classTypeId" property="stateId" />
+			<result column="classTypeName" property="stateName" />
+		</association>
+
+	</resultMap>
+
+
+
+
+	<!-- 获得班班学员的流转日志,什么时间转过什么人 -->
+	<select id="selectClassChanges" resultType="map" parameterType="int">
+SELECT
+		EXEDATE exeDate,
+		s.STUID stuid,
+		s.name stuName,
+		STATENAME changeType,
+		tc.CLASSNAME fromClassName,
+		tc2.CLASSNAME toClassName,
+		tsc.COMMENT comment
+		FROM
+		ta_student_change tsc
+		LEFT JOIN tb_class tc ON tsc.FROM_CLASSID = tc.CLASSID
+		LEFT JOIN tb_class tc2 ON tsc.TO_CLASSID = tc2.CLASSID
+		LEFT JOIN tb_state ts ON tsc.CHANGETYPEID= ts.STATEID
+		LEFT JOIN tb_student s ON tsc.stuid=s.stuid
+		WHERE (tsc.FROM_CLASSID=#{classId} or tsc.TO_CLASSID=#{classId}) AND
+			 tsc.CHANGETYPEID not in(301,306)
+		order by EXEDATE,stuName
+	</select>
+
+
+	<!-- 查询每个班级的学员流转人数信息 退学 ，降班，转班，开班，结班人数等  -->
+	<select id="selectClassStatus" resultType="map" parameterType="tclass">
+		select a.classid
+		classid,beginCount,endCount,exportCount,importCount,fallOutCount,fallInCount,blockingCount,exitCount
+		from
+		(select s.FROM_CLASSID classid,count(DISTINCT(stuid)) beginCount from
+		ta_student_change s
+		where CHANGETYPEID=301 AND FROM_CLASSID=#{classId}) a
+		left
+		join (select FROM_CLASSID classid,count(DISTINCT(stuid)) endCount from
+		ta_student_change
+		where CHANGETYPEID=306 AND FROM_CLASSID=#{classId}) b
+		on
+		a.classid=b.classid
+		left join (select FROM_CLASSID classid,count(DISTINCT(stuid))
+		exportCount from
+		ta_student_change
+		where CHANGETYPEID=302 AND
+		FROM_CLASSID=#{classId}) c
+		on a.classid=c.classid
+		left join (select TO_CLASSID
+		classid,count(DISTINCT(stuid)) importCount from
+		ta_student_change
+		where
+		CHANGETYPEID=302 AND TO_CLASSID=#{classId}) d
+		on a.classid=d.classid
+		left join
+		(select To_CLASSID classid,count(DISTINCT(stuid)) fallOutCount from
+		ta_student_change
+		where CHANGETYPEID=303 AND TO_CLASSID=#{classId}) e
+		on
+		a.classid=e.classid
+		left join (select FROM_CLASSID classid,count(DISTINCT(stuid))
+		fallInCount from
+		ta_student_change
+		where CHANGETYPEID=303 AND
+		FROM_CLASSID=#{classId}) f
+		on a.classid=f.classid
+		left join (select FROM_CLASSID
+		classid,count(DISTINCT(stuid)) blockingCount from
+		ta_student_change
+		where
+		CHANGETYPEID=304 AND FROM_CLASSID=#{classId}) g
+		on a.classid=g.classid
+		left join
+		(select FROM_CLASSID classid,count(DISTINCT(stuid)) exitCount from
+		ta_student_change
+		where CHANGETYPEID=305 AND FROM_CLASSID=#{classId}) h
+		on a.classid=g.classid
+
+	</select>
+</mapper>

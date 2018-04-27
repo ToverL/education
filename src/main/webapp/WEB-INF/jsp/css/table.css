@@ -1,0 +1,17 @@
+@CHARSET "UTF-8";
+	tr{color: #000000; font-size: 12px; background-color:#eeeeee;text-align: left;}
+	.tr_title{background-color:#d3eaef;color: #000000; font-size: 12; }
+	body{background-color:#f3f3f3;}
+	table{
+		border-collapse:collapse;border-style: solid;
+	}
+
+	td,table{border-color: #1243FF;}
+	td {
+		border-width: 1px;
+		border-style: solid;
+	}
+	
+	.changeRecord tr{
+		text-align: center;
+	}

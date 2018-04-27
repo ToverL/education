@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.oracle.dao.UserDao">
+
+
+	<!-- 查询所有的用户，包括角色 -->
+	<select id="getUser" resultType="user" resultMap="userOfRole">
+		select
+		userno,userName,password,
+		realName,u.roleno roleno,
+		u.comment comment,
+		rolename from tb_user u
+		left join tb_role r
+		on u.roleno=r.roleno
+		where
+		userName=#{userName} and password=md5(#{password})
+	</select>
+
+
+	<resultMap type="user" id="userOfRole">
+		<id column="userno" property="userNo" />
+		<result column="userName" property="userName" />
+		<result column="realName" property="realName" />
+		<result column="password" property="password" />
+		<result column="comment" property="comment" />
+		<association property="role" javaType="role">
+			<id column="roleno" property="roleNo" />
+			<result column="roleName" property="roleName" />
+		</association>
+	</resultMap>
+	
+	<insert id="save" parameterType="user">
+		insert into tb_user(userName,password,realName,roleNo,comment)
+		values(#{userName},md5(#{password}),#{realName},null,#{comment})
+	</insert>
+	
+	<update id="update" parameterType="user">
+		update tb_user set password=md5(#{password}),realName=#{realName},comment=#{comment} where userNo=#{userNo}
+	</update>
+	
+	
+	<update id="updatePassword" parameterType="user">
+		update tb_user set password=md5(#{password}) where userNo=#{userNo}
+	</update>
+		
+</mapper>
